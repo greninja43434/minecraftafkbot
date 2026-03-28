@@ -1,4 +1,4 @@
-// ─── State ──────────────────────────────────────────────────────────────────
+// ─── State ────────────────────────────────────────────────────────────────────
 
 let token = localStorage.getItem('afk_token');
 let username = localStorage.getItem('afk_username');
@@ -8,58 +8,30 @@ let editingBotId = null;
 let socket = null;
 let liveConfigDebounce = null;
 
-// ─── Auth Guard ──────────────────────────────────────────────────────────────
-
-if (!token) {
-  window.location.href = '/';
-}
-
+if (!token) window.location.href = '/';
 document.getElementById('topbarUser').textContent = username || '—';
 
-// ─── API Helper ──────────────────────────────────────────────────────────────
+// ─── API Helper ───────────────────────────────────────────────────────────────
 
 async function api(method, path, body) {
   const res = await fetch(path, {
     method,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + token
-    },
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
     body: body ? JSON.stringify(body) : undefined
   });
-
-  if (res.status === 401) {
-    logout();
-    return null;
-  }
-
+  if (res.status === 401) { logout(); return null; }
   return res.json();
 }
 
-// ─── Socket.io ──────────────────────────────────────────────────────────────
+// ─── Socket.io ────────────────────────────────────────────────────────────────
 
 function connectSocket() {
   socket = io({ auth: { token } });
 
-  socket.on('connect', () => {
-    console.log('[Socket] Connected');
-  });
-
-  socket.on('connect_error', (err) => {
-    console.warn('[Socket] Error:', err.message);
-  });
-
   socket.on('bot:log', ({ botId, entry }) => {
-    // Update logs array in our bots state
     const bot = bots.find(b => b.id === botId);
-    if (bot) {
-      if (!bot.logs) bot.logs = [];
-      bot.logs.push(entry);
-    }
-
-    if (botId === selectedBotId) {
-      appendLog(entry);
-    }
+    if (bot) { if (!bot.logs) bot.logs = []; bot.logs.push(entry); }
+    if (botId === selectedBotId) appendLog(entry);
   });
 
   socket.on('bot:statusChange', ({ botId, status }) => {
@@ -70,35 +42,34 @@ function connectSocket() {
   });
 
   socket.on('bot:stats', ({ botId, health, food, ping }) => {
-    if (botId === selectedBotId) {
-      document.getElementById('statHealth').textContent = health + ' ❤';
-      document.getElementById('statFood').textContent = food + ' 🍗';
-      document.getElementById('statPing').textContent = ping + 'ms';
-    }
+    if (botId !== selectedBotId) return;
+    document.getElementById('statHealth').textContent = health + ' ❤';
+    document.getElementById('statFood').textContent = food + ' 🍗';
+    document.getElementById('statPing').textContent = ping + 'ms';
   });
 }
 
-// ─── Render ──────────────────────────────────────────────────────────────────
+// ─── Render Bot List ──────────────────────────────────────────────────────────
 
 function renderBotList() {
   const list = document.getElementById('botList');
-
   if (!bots.length) {
     list.innerHTML = '<div class="empty-state"><p>No bots yet.<br/>Click + to add your first bot.</p></div>';
     return;
   }
-
   list.innerHTML = bots.map(bot => `
     <div class="bot-item ${bot.id === selectedBotId ? 'active' : ''}" onclick="selectBot('${bot.id}')">
-      <div class="bot-item-name">${escHtml(bot.name)}</div>
-      <div class="bot-item-host">${escHtml(bot.host)}:${bot.port}</div>
+      <div class="bot-item-name">${esc(bot.name)}</div>
+      <div class="bot-item-host">${esc(bot.host)}:${bot.port}</div>
       <div class="bot-item-status">
         <div class="status-badge ${bot.status || 'offline'}">${(bot.status || 'offline').toUpperCase()}</div>
-        <span style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-muted)">${escHtml(bot.username)}</span>
+        <span style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-muted)">${esc(bot.username)}</span>
       </div>
     </div>
   `).join('');
 }
+
+// ─── Status UI ────────────────────────────────────────────────────────────────
 
 function updateStatusUI(status) {
   const el = document.getElementById('statStatus');
@@ -107,14 +78,8 @@ function updateStatusUI(status) {
   const stopBtn = document.getElementById('btnStop');
 
   el.textContent = status.toUpperCase();
-  el.style.color = {
-    online: 'var(--success)',
-    offline: 'var(--text-muted)',
-    connecting: 'var(--warn)',
-    error: 'var(--error)'
-  }[status] || 'var(--text-muted)';
-
-  dot.className = 'ping-indicator ' + (status === 'online' ? 'online' : '');
+  el.style.color = { online: 'var(--success)', offline: 'var(--text-muted)', connecting: 'var(--warn)', error: 'var(--error)' }[status] || 'var(--text-muted)';
+  dot.className = 'ping-indicator' + (status === 'online' ? ' online' : '');
 
   if (status === 'online') {
     startBtn.style.display = 'none';
@@ -128,18 +93,16 @@ function updateStatusUI(status) {
   }
 }
 
+// ─── Log output ──────────────────────────────────────────────────────────────
+
 function appendLog(entry) {
   const output = document.getElementById('logOutput');
   const div = document.createElement('div');
   div.className = 'log-entry ' + (entry.type || 'info');
-
   const t = new Date(entry.time);
-  const timeStr = t.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-  div.innerHTML = `<span class="log-time">${timeStr}</span><span class="log-msg">${escHtml(entry.message)}</span>`;
+  const ts = t.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  div.innerHTML = `<span class="log-time">${ts}</span><span class="log-msg">${esc(entry.message)}</span>`;
   output.appendChild(div);
-
-  // Auto-scroll
   output.scrollTop = output.scrollHeight;
 }
 
@@ -149,16 +112,21 @@ function clearLogs() {
   if (bot) bot.logs = [];
 }
 
-function escHtml(str) {
+function esc(str) {
   if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ─── Bot Selection ───────────────────────────────────────────────────────────
+// ─── Panel Tab Switching ──────────────────────────────────────────────────────
+
+function switchPanelTab(name, btn) {
+  document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
+}
+
+// ─── Select Bot ───────────────────────────────────────────────────────────────
 
 function selectBot(id) {
   selectedBotId = id;
@@ -166,10 +134,8 @@ function selectBot(id) {
   if (!bot) return;
 
   renderBotList();
-
   document.getElementById('welcomeScreen').style.display = 'none';
-  const panel = document.getElementById('botPanel');
-  panel.className = 'bot-panel active';
+  document.getElementById('botPanel').className = 'bot-panel active';
 
   document.getElementById('panelBotName').textContent = bot.name;
   document.getElementById('panelBotHost').textContent = `${bot.host}:${bot.port}`;
@@ -177,7 +143,6 @@ function selectBot(id) {
   document.getElementById('cfgServer').value = `${bot.host}:${bot.port}`;
   document.getElementById('cfgVersion').value = bot.version || 'Auto';
 
-  // Anti-AFK live controls
   const a = bot.antiAfk || {};
   document.getElementById('liveJumpEnabled').checked = a.jumpEnabled ?? true;
   document.getElementById('liveJumpInterval').value = a.jumpInterval ?? 30;
@@ -188,27 +153,26 @@ function selectBot(id) {
 
   updateStatusUI(bot.status || 'offline');
 
-  // Render existing logs
+  // Logs
   const output = document.getElementById('logOutput');
   output.innerHTML = '';
-  (bot.logs || []).forEach(entry => appendLog(entry));
+  (bot.logs || []).forEach(e => appendLog(e));
+
+  // Timed messages
+  renderTimedMessages(bot.timedMessages || []);
 }
 
-// ─── Load Bots ───────────────────────────────────────────────────────────────
+// ─── Load Bots ────────────────────────────────────────────────────────────────
 
 async function loadBots() {
   const data = await api('GET', '/api/bots');
   if (!data) return;
   bots = data;
   renderBotList();
-
-  // Re-select current bot if still exists
-  if (selectedBotId && bots.find(b => b.id === selectedBotId)) {
-    selectBot(selectedBotId);
-  }
+  if (selectedBotId && bots.find(b => b.id === selectedBotId)) selectBot(selectedBotId);
 }
 
-// ─── Bot Control ─────────────────────────────────────────────────────────────
+// ─── Bot Controls ─────────────────────────────────────────────────────────────
 
 async function controlBot(action) {
   if (!selectedBotId) return;
@@ -218,9 +182,7 @@ async function controlBot(action) {
 async function deleteBot() {
   if (!selectedBotId) return;
   const bot = bots.find(b => b.id === selectedBotId);
-  if (!bot) return;
-  if (!confirm(`Delete bot "${bot.name}"? This cannot be undone.`)) return;
-
+  if (!confirm(`Delete bot "${bot?.name}"?`)) return;
   await api('DELETE', `/api/bots/${selectedBotId}`);
   selectedBotId = null;
   document.getElementById('botPanel').className = 'bot-panel';
@@ -236,19 +198,16 @@ async function sendChat() {
   await api('POST', `/api/bots/${selectedBotId}/chat`, { message });
 }
 
-document.getElementById('chatInput').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') sendChat();
-});
+document.getElementById('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
 
-// ─── Live Anti-AFK Config Save ───────────────────────────────────────────────
+// ─── Anti-AFK Live Save ───────────────────────────────────────────────────────
 
-async function saveLiveConfig() {
+async function saveLiveConfig(immediate = false) {
   if (!selectedBotId) return;
   clearTimeout(liveConfigDebounce);
-  liveConfigDebounce = setTimeout(async () => {
+  const doSave = async () => {
     const bot = bots.find(b => b.id === selectedBotId);
     if (!bot) return;
-
     const antiAfk = {
       jumpEnabled: document.getElementById('liveJumpEnabled').checked,
       jumpInterval: parseInt(document.getElementById('liveJumpInterval').value) || 30,
@@ -257,20 +216,121 @@ async function saveLiveConfig() {
       lookEnabled: document.getElementById('liveLookEnabled').checked,
       lookInterval: parseInt(document.getElementById('liveLookInterval').value) || 20
     };
-
-    const updated = await api('PUT', `/api/bots/${selectedBotId}`, {
-      ...bot,
-      antiAfk
-    });
-
-    if (updated) {
-      const idx = bots.findIndex(b => b.id === selectedBotId);
-      if (idx !== -1) bots[idx] = { ...bots[idx], ...updated };
-    }
-  }, 600);
+    const updated = await api('PUT', `/api/bots/${selectedBotId}`, { ...bot, antiAfk });
+    if (updated) { const idx = bots.findIndex(b => b.id === selectedBotId); if (idx !== -1) bots[idx] = { ...bots[idx], ...updated }; }
+  };
+  if (immediate) { await doSave(); return; }
+  liveConfigDebounce = setTimeout(doSave, 700);
 }
 
-// ─── Modal ───────────────────────────────────────────────────────────────────
+// ─── Timed Messages ───────────────────────────────────────────────────────────
+
+function renderTimedMessages(messages) {
+  const list = document.getElementById('timedList');
+  if (!messages.length) {
+    list.innerHTML = '<div style="text-align:center;padding:24px;font-family:\'Share Tech Mono\',monospace;font-size:11px;color:var(--text-muted)">No scheduled messages.<br>Click + Add to create one.</div>';
+    return;
+  }
+
+  list.innerHTML = messages.map((tm, i) => `
+    <div class="timed-item ${tm.enabled ? 'enabled-item' : ''}" id="tmItem_${tm.id}">
+      <div class="timed-item-top">
+        <span class="timed-num">#${i + 1}</span>
+        <input
+          class="timed-msg-input"
+          type="text"
+          placeholder="Message or /command..."
+          value="${esc(tm.message)}"
+          maxlength="256"
+          data-id="${tm.id}"
+          data-field="message"
+          oninput="updateTimedField('${tm.id}', 'message', this.value)"
+        />
+      </div>
+      <div class="timed-item-bottom">
+        <span class="timed-time-label">Every</span>
+        <input
+          class="timed-time-input"
+          type="number"
+          min="0"
+          max="23"
+          value="${tm.hours || 0}"
+          data-id="${tm.id}"
+          oninput="updateTimedField('${tm.id}', 'hours', this.value)"
+        />
+        <span class="timed-time-label">h</span>
+        <input
+          class="timed-time-input"
+          type="number"
+          min="0"
+          max="59"
+          value="${tm.minutes || 5}"
+          data-id="${tm.id}"
+          oninput="updateTimedField('${tm.id}', 'minutes', this.value)"
+        />
+        <span class="timed-time-label">m</span>
+        <div class="timed-spacer"></div>
+        <label class="timed-toggle" title="${tm.enabled ? 'Enabled' : 'Disabled'}">
+          <input type="checkbox" ${tm.enabled ? 'checked' : ''} onchange="updateTimedField('${tm.id}', 'enabled', this.checked)" />
+          <span class="timed-slider"></span>
+        </label>
+        <button class="timed-del" onclick="removeTimedMessage('${tm.id}')" title="Delete">✕</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function getTimedMessages() {
+  const bot = bots.find(b => b.id === selectedBotId);
+  return bot?.timedMessages || [];
+}
+
+function updateTimedField(id, field, value) {
+  const bot = bots.find(b => b.id === selectedBotId);
+  if (!bot || !bot.timedMessages) return;
+  const tm = bot.timedMessages.find(t => t.id === id);
+  if (!tm) return;
+  if (field === 'enabled') tm.enabled = value;
+  else if (field === 'hours') tm.hours = parseInt(value) || 0;
+  else if (field === 'minutes') tm.minutes = parseInt(value) || 0;
+  else tm[field] = value;
+
+  // Update enabled styling
+  const item = document.getElementById('tmItem_' + id);
+  if (item) item.className = 'timed-item' + (tm.enabled ? ' enabled-item' : '');
+}
+
+function addTimedMessage() {
+  const bot = bots.find(b => b.id === selectedBotId);
+  if (!bot) return;
+  if (!bot.timedMessages) bot.timedMessages = [];
+  const newMsg = { id: Date.now().toString(), enabled: false, message: '', hours: 0, minutes: 5 };
+  bot.timedMessages.push(newMsg);
+  renderTimedMessages(bot.timedMessages);
+  // Scroll to bottom
+  const list = document.getElementById('timedList');
+  list.scrollTop = list.scrollHeight;
+}
+
+function removeTimedMessage(id) {
+  const bot = bots.find(b => b.id === selectedBotId);
+  if (!bot || !bot.timedMessages) return;
+  bot.timedMessages = bot.timedMessages.filter(t => t.id !== id);
+  renderTimedMessages(bot.timedMessages);
+}
+
+async function saveTimedMessages() {
+  if (!selectedBotId) return;
+  const bot = bots.find(b => b.id === selectedBotId);
+  if (!bot) return;
+  const updated = await api('PUT', `/api/bots/${selectedBotId}`, { ...bot, timedMessages: bot.timedMessages });
+  if (updated) {
+    const idx = bots.findIndex(b => b.id === selectedBotId);
+    if (idx !== -1) bots[idx] = { ...bots[idx], ...updated };
+  }
+}
+
+// ─── Modal ────────────────────────────────────────────────────────────────────
 
 function openAddModal() {
   editingBotId = null;
@@ -293,7 +353,6 @@ function openAddModal() {
 function openEditModal() {
   const bot = bots.find(b => b.id === selectedBotId);
   if (!bot) return;
-
   editingBotId = bot.id;
   document.getElementById('modalTitle').textContent = 'EDIT BOT';
   document.getElementById('mName').value = bot.name;
@@ -301,7 +360,6 @@ function openEditModal() {
   document.getElementById('mHost').value = bot.host;
   document.getElementById('mPort').value = bot.port;
   document.getElementById('mVersion').value = bot.version || '';
-
   const a = bot.antiAfk || {};
   document.getElementById('mJumpEnabled').checked = a.jumpEnabled ?? true;
   document.getElementById('mJumpInterval').value = a.jumpInterval ?? 30;
@@ -309,7 +367,6 @@ function openEditModal() {
   document.getElementById('mWalkInterval').value = a.walkInterval ?? 45;
   document.getElementById('mLookEnabled').checked = a.lookEnabled ?? true;
   document.getElementById('mLookInterval').value = a.lookInterval ?? 20;
-
   clearModalAlert();
   document.getElementById('botModal').classList.add('open');
 }
@@ -337,10 +394,7 @@ async function saveBot() {
   const host = document.getElementById('mHost').value.trim();
   const port = document.getElementById('mPort').value.trim();
   const version = document.getElementById('mVersion').value;
-
-  if (!name || !username || !host || !port) {
-    return showModalAlert('Name, username, host and port are required', 'error');
-  }
+  if (!name || !username || !host || !port) return showModalAlert('Name, username, host and port are required', 'error');
 
   const antiAfk = {
     jumpEnabled: document.getElementById('mJumpEnabled').checked,
@@ -351,35 +405,28 @@ async function saveBot() {
     lookInterval: parseInt(document.getElementById('mLookInterval').value) || 20
   };
 
-  const payload = { name, username, host, port: parseInt(port), version, antiAfk };
+  const existingBot = editingBotId ? bots.find(b => b.id === editingBotId) : null;
+  const payload = { name, username, host, port: parseInt(port), version, antiAfk, timedMessages: existingBot?.timedMessages ?? undefined };
 
   let result;
-  if (editingBotId) {
-    result = await api('PUT', `/api/bots/${editingBotId}`, payload);
-  } else {
-    result = await api('POST', '/api/bots', payload);
-  }
+  if (editingBotId) result = await api('PUT', `/api/bots/${editingBotId}`, payload);
+  else result = await api('POST', '/api/bots', payload);
 
-  if (!result || result.error) {
-    return showModalAlert(result?.error || 'Failed to save bot', 'error');
-  }
+  if (!result || result.error) return showModalAlert(result?.error || 'Failed to save', 'error');
 
   showModalAlert(editingBotId ? 'Bot updated!' : 'Bot created!', 'success');
   await loadBots();
-
   setTimeout(() => {
     closeModal();
-    if (!editingBotId && result.id) selectBot(result.id);
-    else if (editingBotId) selectBot(editingBotId);
+    selectBot(editingBotId || result.id);
   }, 700);
 }
 
-// Close modal on overlay click
-document.getElementById('botModal').addEventListener('click', (e) => {
+document.getElementById('botModal').addEventListener('click', e => {
   if (e.target === document.getElementById('botModal')) closeModal();
 });
 
-// ─── Auth ────────────────────────────────────────────────────────────────────
+// ─── Auth ─────────────────────────────────────────────────────────────────────
 
 function logout() {
   localStorage.removeItem('afk_token');
@@ -387,9 +434,9 @@ function logout() {
   window.location.href = '/';
 }
 
-// ─── Init ────────────────────────────────────────────────────────────────────
+// ─── Init ─────────────────────────────────────────────────────────────────────
 
-(async function init() {
+(async () => {
   connectSocket();
   await loadBots();
 })();
