@@ -151,6 +151,10 @@ function selectBot(id) {
   document.getElementById('liveLookEnabled').checked = a.lookEnabled ?? true;
   document.getElementById('liveLookInterval').value = a.lookInterval ?? 20;
 
+  document.getElementById('liveAutoRejoin').checked = bot.autoRejoin ?? false;
+  document.getElementById('liveAutoLeave').checked = bot.autoLeave ?? false;
+  document.getElementById('liveOnJoinCommand').value = bot.onJoinCommand ?? '';
+
   updateStatusUI(bot.status || 'offline');
 
   // Logs
@@ -216,7 +220,10 @@ async function saveLiveConfig(immediate = false) {
       lookEnabled: document.getElementById('liveLookEnabled').checked,
       lookInterval: parseInt(document.getElementById('liveLookInterval').value) || 20
     };
-    const updated = await api('PUT', `/api/bots/${selectedBotId}`, { ...bot, antiAfk });
+    const autoRejoin = document.getElementById('liveAutoRejoin').checked;
+    const autoLeave = document.getElementById('liveAutoLeave').checked;
+    const onJoinCommand = document.getElementById('liveOnJoinCommand').value.trim();
+    const updated = await api('PUT', `/api/bots/${selectedBotId}`, { ...bot, antiAfk, autoRejoin, autoLeave, onJoinCommand });
     if (updated) { const idx = bots.findIndex(b => b.id === selectedBotId); if (idx !== -1) bots[idx] = { ...bots[idx], ...updated }; }
   };
   if (immediate) { await doSave(); return; }
@@ -293,6 +300,7 @@ function updateTimedField(id, field, value) {
   if (field === 'enabled') tm.enabled = value;
   else if (field === 'hours') tm.hours = parseInt(value) || 0;
   else if (field === 'minutes') tm.minutes = parseInt(value) || 0;
+  else if (field === 'seconds') tm.seconds = parseInt(value) || 0;
   else tm[field] = value;
 
   // Update enabled styling
@@ -304,7 +312,7 @@ function addTimedMessage() {
   const bot = bots.find(b => b.id === selectedBotId);
   if (!bot) return;
   if (!bot.timedMessages) bot.timedMessages = [];
-  const newMsg = { id: Date.now().toString(), enabled: false, message: '', hours: 0, minutes: 5 };
+  const newMsg = { id: Date.now().toString(), enabled: false, message: '', hours: 0, minutes: 5, seconds: 0 };
   bot.timedMessages.push(newMsg);
   renderTimedMessages(bot.timedMessages);
   // Scroll to bottom
@@ -406,7 +414,7 @@ async function saveBot() {
   };
 
   const existingBot = editingBotId ? bots.find(b => b.id === editingBotId) : null;
-  const payload = { name, username, host, port: parseInt(port), version, antiAfk, timedMessages: existingBot?.timedMessages ?? undefined };
+  const payload = { name, username, host, port: parseInt(port), version, antiAfk, timedMessages: existingBot?.timedMessages ?? undefined, autoRejoin: existingBot?.autoRejoin ?? false, autoLeave: existingBot?.autoLeave ?? false, onJoinCommand: existingBot?.onJoinCommand ?? '' };
 
   let result;
   if (editingBotId) result = await api('PUT', `/api/bots/${editingBotId}`, payload);

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AFK.gg — Dashboard</title>
+  <title>SleepyAfk — Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@700;900&display=swap" rel="stylesheet" />
   <style>
@@ -538,7 +538,7 @@
 <body>
 
 <div class="topbar">
-  <div class="brand">AFK.GG</div>
+  <div class="brand">SleepyAfk</div>
   <div class="topbar-sep"></div>
   <div class="topbar-user">Logged in as <span id="topbarUser">—</span></div>
   <div class="topbar-actions">
@@ -650,6 +650,24 @@
               <div class="config-field"><label>Username</label><input type="text" id="cfgUsername" readonly /></div>
               <div class="config-field"><label>Server</label><input type="text" id="cfgServer" readonly /></div>
               <div class="config-field"><label>Version</label><input type="text" id="cfgVersion" readonly /></div>
+            </div>
+          </div>
+
+          <div class="config-section">
+            <div class="config-section-header"><span>Connection</span></div>
+            <div class="config-body">
+              <div class="toggle-row">
+                <span class="toggle-label">Auto-Rejoin</span>
+                <label class="toggle"><input type="checkbox" id="liveAutoRejoin" onchange="saveLiveConfig()" /><span class="toggle-slider"></span></label>
+              </div>
+              <div class="toggle-row">
+                <span class="toggle-label">Auto-Leave on Kick</span>
+                <label class="toggle"><input type="checkbox" id="liveAutoLeave" onchange="saveLiveConfig()" /><span class="toggle-slider"></span></label>
+              </div>
+              <div class="config-field">
+                <label>On-Join Command</label>
+                <input type="text" id="liveOnJoinCommand" placeholder="/lobby" maxlength="256" onchange="saveLiveConfig()" />
+              </div>
             </div>
           </div>
 
